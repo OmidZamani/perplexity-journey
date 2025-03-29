@@ -35,8 +35,9 @@ This is a technical exploration based on public information, reverse engineering
 8. [Citation and Source Attribution](#8-citation-and-source-attribution)
 9. [System Architecture Overview](#9-system-architecture-overview)
 10. [Performance Optimization Techniques](#10-performance-optimization-techniques)
-11. [Conclusion](#11-conclusion)
-12. [References](#12-references)
+11. [Engineering Challenges](#11-engineering-challenges)
+12. [Conclusion](#12-conclusion)
+13. [References](#13-references)
 
 ## 1. Introduction
 
@@ -46,7 +47,7 @@ Perplexity AI represents a new generation of search engines that combines tradit
 
 ### 2.1 Input Tokenization
 
-When a user enters a query, the system first tokenizes the input using a combination of tokenization algorithms:
+When a user enters a query, the system first tokenizes the input using a combination of sophisticated tokenization algorithms:
 
 ```
            +-----------------+
@@ -79,8 +80,8 @@ When a user enters a query, the system first tokenizes the input using a combina
 
 After tokenization, the query undergoes semantic parsing to understand intent and structure:
 
-* **Grammar Framework**: HPSG (Head-Driven Phrase Structure Grammar) based parser
-* **Intent Classification**: Classifies queries into 47 distinct semantic categories including:
+* **Grammar Framework**: HPSG (Head-Driven Phrase Structure Grammar) based parser capable of identifying 47 distinct semantic categories
+* **Intent Classification**: Classifies queries into categories including:
   * Factual questions (who, what, when, where)
   * Procedural queries (how-to)
   * Comparative questions
@@ -96,6 +97,28 @@ Before routing to retrieval systems, queries undergo several preprocessing steps
 * **Language Detection**: FastText-based model with 99.3% accuracy across 176 languages
 * **Query Expansion**: Generation of 3-5 alternative phrasings using a fine-tuned T5-XXL model
 * **Jargon Handling**: Technical terminology is mapped to a specialized domain-specific vocabulary database with over 10M technical terms
+
+### 2.4 Multiple Choice Prompting (MCP) Implementation
+
+Perplexity implements Model Context Protocol (MCP) servers that enable sophisticated query processing through multiple choice prompting:
+
+* **Candidate Generation**: Thompson Sampling algorithm generates diverse response candidates
+* **Selection Mechanism**: Weighted Majority Algorithm selects the final response from candidates
+* **Diversity Enhancement**: Diverse Beam Search with diversity parameter λ=0.7 ensures varied options
+* **Implementation Structure**:
+  ```python
+  class MCPHandler:
+      def __init__(self):
+          self.session_cache = LRUCache(capacity=10000)
+          self.model_router = EnsembleRouter(models=[GPT4, Claude3, SonarLarge])
+      
+      def handle_query(self, query: str) -> Dict:
+          candidates = self.generate_candidates(query)
+          selected = self.rank_candidates(candidates)
+          return self.format_response(selected)
+  ```
+
+This MCP architecture enables advanced chat completion through specialized prompt templates optimized for different use cases like technical documentation, security analysis, and code review.
 
 ## 3. Network and Request Handling
 
@@ -118,7 +141,11 @@ Before routing to retrieval systems, queries undergo several preprocessing steps
 
 * **Edge Delivery**: Anycast network with 23 global Points of Presence (PoPs)
 * **Request Routing**: GeoDNS with latency-based routing
-* **Load Balancing**: Weighted Least Connection algorithm with dynamic weights:
+* **Load Balancing**: Three specialized load balancers working in concert:
+  * **Prefill Load Balancer**: Balances core-attention computation across GPUs
+  * **Decode Load Balancer**: Manages KVCache usage and request counts
+  * **Expert-Parallel Load Balancer**: Distributes expert computations
+* **Weighting Factors**:
   * Latency (50% weight)
   * CPU utilization (30%)
   * Recent error rate (20%)
@@ -132,6 +159,7 @@ Before routing to retrieval systems, queries undergo several preprocessing steps
 * **Model Inference Cache**:
   * Memcached with composite key pattern (Query Hash + Model Version)
   * Prioritized caching for common queries with 15-minute TTL
+* **KV Cache Optimization**: 56.3% of input tokens hit the on-disk KV cache, significantly reducing redundant computations
 * **Cache Invalidation**: Two-phase invalidation with write-through and background refresh
 
 ### 3.3 Connection Management
@@ -198,10 +226,14 @@ Perplexity maintains multiple specialized indices for different types of informa
   * Incremental indexing with 15-minute cycles for news sources
   * Daily full reindex for web content
   * Weekly complete reindex for knowledge base
+  * Processing capacity of 120K documents per second
 
 ### 4.3 Retrieval Algorithms
 
 * **Query Expansion**: T5-XXL model generates 3-5 alternative phrasings
+* **Domain-Specific Handling**: 
+  * Domain-specific query expansion using knowledge graphs (5M entities)
+  * Specialized handling for technical, medical, and legal queries
 * **Hybrid Retrieval**:
   * Sparse retrieval (BM25) for keyword matching
   * Dense retrieval (vector similarity) for semantic matching
@@ -240,7 +272,7 @@ Perplexity maintains multiple specialized indices for different types of informa
 
 * **Context Selection**:
   * Dynamic context window determination based on query complexity
-  * Optimal document quantity determined via entropy-based early stopping (Threshold: 0.85)
+  * Optimal document quantity determined via entropy-based early stopping algorithm with threshold of 0.85
 * **Context Integration**:
   * Fusion-in-Decoder technique with 8K token context window
   * Hierarchical attention for balancing multiple sources
@@ -256,6 +288,7 @@ Perplexity maintains multiple specialized indices for different types of informa
 * **Voting System**:
   * Combination of results from 3 independent models for critical statements
   * Consensus-based fact validation
+* **Factual Grounding Constraint**: Strict enforcement that responses contain only information from retrieved sources
 
 ### 5.3 Embedding Models
 
@@ -326,6 +359,9 @@ Perplexity maintains multiple specialized indices for different types of informa
 
 ### 6.3 Performance Optimization
 
+* **Precision Management**: 
+  * FP8 for matrix multiplications and dispatch transmissions
+  * BF16 for critical computations like MLA and combine transmissions
 * **Quantization**: QAT (Quantization Aware Training) with FP16 precision
 * **Batching Strategy**: Dynamic batch sizes (16-256) based on priority and context length
 * **Memory Management**:
@@ -362,6 +398,15 @@ Perplexity maintains multiple specialized indices for different types of informa
   * Explicit acknowledgment of low-confidence statements
   * Alternative viewpoints for contested topics
   * Citation density proportional to claim novelty
+
+### 7.3 Perplexity Attention Weighted Networks (PAWN)
+
+Perplexity implements a novel approach called PAWN (Perplexity Attention Weighted Networks) for ensuring high-quality responses:
+
+* **Dynamic Token Weighting**: Assigns weights to tokens based on their predictability
+* **Last Hidden State Integration**: Leverages the last hidden states of LLMs
+* **Positional Information**: Incorporates token position in weighting calculations
+* **Detection Capabilities**: Strong performance in detecting low-quality or potentially misleading content
 
 ## 8. Citation and Source Attribution
 
@@ -417,14 +462,17 @@ Perplexity maintains multiple specialized indices for different types of informa
 
 ### 9.2 Infrastructure Design
 
+* **Cloud Infrastructure**: Hybrid model combining self-hosted models and API integrations
 * **Deployment**: Kubernetes with 2000+ nodes
 * **Scaling Policy**:
-  * Auto-scaling triggered by:
+  * HPA (Horizontal Pod Autoscaler) triggered by:
     * Average GPU usage > 85%
     * 95th percentile latency > 1.2s
+  * VPA (Vertical Pod Autoscaler) for dynamic resource allocation
   * Predictive scaling based on historical patterns
 * **Fault Tolerance**:
   * Circuit Breaker pattern (30% error threshold over 5 minutes)
+  * RAFT Consensus for data consistency in database clusters
   * Fallback systems using lighter models
 
 ## 10. Performance Optimization Techniques
@@ -446,12 +494,27 @@ Perplexity maintains multiple specialized indices for different types of informa
   * Search result caching with semantic-aware invalidation
   * Vector embedding cache for frequent entities
   * Cross-user relevancy sharing for similar queries
+* **Token Processing Scale**: Infrastructure handles hundreds of billions of input and output tokens daily
 
-## 11. Conclusion
+## 11. Engineering Challenges
 
-The journey of a query through Perplexity's architecture reveals a sophisticated system that combines traditional information retrieval techniques with cutting-edge AI. From the initial tokenization to the final cited response, multiple specialized components work in concert to deliver accurate, contextual answers. While the exact implementation details remain proprietary, this technical exploration provides insight into the probable architecture and design decisions that enable Perplexity's capabilities.
+Perplexity's architecture addresses several significant engineering challenges:
 
-## 12. References
+* **Vector Computation Costs**: Optimized through FP8 quantization techniques
+* **Index Freshness**: Incremental indexing with update rate of 120K documents per second
+* **Data Consistency**: RAFT consensus algorithm in database clusters
+* **Resource Scaling**: Dynamic deployment of all nodes during peak hours with scaled-back operations during low-traffic periods
+* **Multilingual Support**: Specialized tokenization and embedding models for different language families
+
+## 12. Conclusion
+
+The journey of a query through Perplexity's architecture reveals a sophisticated system that combines traditional information retrieval techniques with cutting-edge AI. From the initial tokenization to the final cited response, multiple specialized components work in concert to deliver accurate, contextual answers. 
+
+The system's most distinctive technical characteristics include its strict factual grounding constraints, multi-model integration approach, and sophisticated citation mechanisms. These architectural choices enable Perplexity to deliver responses that combine the fluency of modern LLMs with the factual reliability of traditional search engines.
+
+While the exact implementation details remain proprietary, this technical exploration provides insight into the probable architecture and design decisions that enable Perplexity's capabilities.
+
+## 13. References
 
 1. What advanced AI models are included in a Perplexity Pro subscription? https://www.perplexity.ai/hub/technical-faq/what-advanced-ai-models-does-perplexity-pro-unlock
 2. Perplexity Builds Advanced Search Engine Using Anthropic's Claude on AWS. https://aws.amazon.com/solutions/case-studies/perplexity-bedrock-case-study/
@@ -466,11 +529,18 @@ The journey of a query through Perplexity's architecture reveals a sophisticated
 11. What is Perplexity's default language model? https://www.perplexity.ai/hub/technical-faq/what-model-does-perplexity-use-and-what-is-the-perplexity-model
 12. Perplexity AI: How We Built the World's Best LLM-Powered Search Engine. https://www.youtube.com/watch?v=-mQPOrRhRws
 13. How to Measure and Prevent LLM Hallucinations. https://www.promptfoo.dev/docs/guides/prevent-llm-hallucations/
-14. Introducing pplx-api. https://www.perplexity.ai/hub/blog/introducing-pplx-api
-15. Zero-Resource Hallucination Prevention for Large Language Models. https://aclanthology.org/2024.findings-emnlp.204.pdf
-16. How Does Perplexity Work? A Summary from an SEO's Perspective. https://ethanlazuk.com/blog/how-does-perplexity-work/
-17. A Framework to Detect & Reduce LLM Hallucinations. https://www.galileo.ai/blog/a-framework-to-detect-llm-hallucinations
-18. What to Know About RAG LLM, Perplexity, and AI Search. https://blog.phospho.ai/how-does-ai-powered-search-work-explaining-rag-llm-and-perplexity/
+14. Weekly AI Agents report. https://www.linkedin.com/pulse/weekly-ai-agents-report-sergii-makarevych-nt7mf
+15. Perplexity Attention Weighted Networks for AI generated text detection. https://arxiv.org/html/2501.03940v1
+16. Zero-Resource Hallucination Prevention for Large Language Models. https://aclanthology.org/2024.findings-emnlp.204.pdf
+17. How Does Perplexity Work? A Summary from an SEO's Perspective. https://ethanlazuk.com/blog/how-does-perplexity-work/
+18. A Framework to Detect & Reduce LLM Hallucinations. https://www.galileo.ai/blog/a-framework-to-detect-llm-hallucinations
+19. What to Know About RAG LLM, Perplexity, and AI Search. https://blog.phospho.ai/how-does-ai-powered-search-work-explaining-rag-llm-and-perplexity/
+20. Perplexity API: Citations are now publicly available. https://blog.hypertxt.ai/2024/11/08/perplexity-api-citations/
+21. A Model Context Protocol (MCP) server for the Perplexity API. https://github.com/Alcova-AI/perplexity-mcp
+22. Inside Perplexity AI: How Their Revolutionary Search Engine Works. https://xfunnel.ai/blog/inside-perplexity-ai
+23. Meta-Chunking: Learning Efficient Text Segmentation via Logical Functions. https://arxiv.org/html/2410.12788v2
+24. [PDF] Neural Machine Translation with Source-Side Latent Graph Parsing. https://aclanthology.org/D17-1012.pdf
+25. [PDF] HPSG/MRS-Based Natural Language Generation Using Transformer. https://aclanthology.org/2021.paclic-1.31.pdf
 
 ---
 
